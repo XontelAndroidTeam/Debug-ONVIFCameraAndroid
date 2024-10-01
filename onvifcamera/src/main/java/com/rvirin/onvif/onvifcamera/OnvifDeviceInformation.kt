@@ -50,10 +50,10 @@ class OnvifDeviceInformation {
 
                     if (eventType == XmlPullParser.START_TAG && xpp.name == "Manufacturer") {
                         xpp.next()
-                        parsed.manufacturerName = xpp.text
+                        parsed.manufacturerName = xpp.text.toString()+"##@@!!"
                     } else if (eventType == XmlPullParser.START_TAG && xpp.name == "Model") {
                         xpp.next()
-                        parsed.modelName = xpp.text
+                        parsed.modelName = xpp.text.toString()+"##@@!!"
                     } else if (eventType == XmlPullParser.START_TAG && xpp.name == "FirmwareVersion") {
                         xpp.next()
                         parsed.fwVersion = xpp.text

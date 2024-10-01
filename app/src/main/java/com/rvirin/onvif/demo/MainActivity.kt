@@ -1,20 +1,22 @@
-package com.rvirin.onvif.demo
+package com.xontel.onvif
 
 import android.content.Intent
-import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import com.rvirin.onvif.R
-import com.rvirin.onvif.onvifcamera.*
-
-import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetStreamURI
-import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetProfiles
+import androidx.appcompat.app.AppCompatActivity
+import com.rvirin.onvif.demo.ONVIFUtil
+import com.rvirin.onvif.onvifcamera.OnvifDevice
+import com.rvirin.onvif.onvifcamera.OnvifListener
 import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetDeviceInformation
+import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetProfiles
 import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetServices
+import com.rvirin.onvif.onvifcamera.OnvifRequest.Type.GetStreamURI
+import com.rvirin.onvif.onvifcamera.OnvifResponse
+import com.rvirin.onvif.onvifcamera.currentDevice
 
 const val RTSP_URL = "com.rvirin.onvif.onvifcamera.demo.RTSP_URL"
 
@@ -38,12 +40,19 @@ class MainActivity : AppCompatActivity(), OnvifListener {
         toast?.cancel()
 
         if (!response.success) {
-            Log.e("ERROR", "request failed: ${response.request.type} \n Response: ${response.error}")
-            toast = Toast.makeText(this, "⛔️ Request failed: ${response.request.type}", Toast.LENGTH_SHORT)
+            Log.e(
+                "ERROR",
+                "request failed: ${response.request.type} \n Response: ${response.error}"
+            )
+            toast = Toast.makeText(
+                this,
+                "⛔️ Request failed: ${response.request.type}",
+                Toast.LENGTH_SHORT
+            )
             toast?.show()
         }
         // if GetServices have been completed, we request the device information
-            else if (response.request.type == GetServices) {
+        else if (response.request.type == GetServices) {
             currentDevice.getDeviceInformation()
         }
         // if GetDeviceInformation have been completed, we request the profiles
@@ -72,7 +81,11 @@ class MainActivity : AppCompatActivity(), OnvifListener {
             val button = findViewById<TextView>(R.id.button)
             button.text = getString(R.string.Play)
 
-            toast = Toast.makeText(this, "Stream URI retrieved,\nready for the movie 🍿", Toast.LENGTH_SHORT)
+            toast = Toast.makeText(
+                this,
+                "Stream URI retrieved,\nready for the movie 🍿",
+                Toast.LENGTH_SHORT
+            )
             toast?.show()
         }
     }
@@ -82,6 +95,11 @@ class MainActivity : AppCompatActivity(), OnvifListener {
         // If we were able to retrieve information from the camera, and if we have a rtsp uri,
         // We open StreamActivity and pass the rtsp URI
         if (currentDevice.isConnected) {
+            Log.e("@l0g", "rtspURI = ${currentDevice.rtspURI}")
+
+            currentDevice.mediaProfiles.forEach { profile ->
+                Log.e("@l0g", "profile = ${profile.name}")
+            }
             currentDevice.rtspURI?.let { uri ->
                 val intent = Intent(this, StreamActivity::class.java).apply {
                     putExtra(RTSP_URL, uri)

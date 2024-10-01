@@ -23,7 +23,7 @@ class OnvifDigestInformation(val username: String, val password: String, val uri
     private fun md5(string: String): String? {
         val HEX_CHARS = "0123456789abcdef"
         val bytes = MessageDigest.getInstance(MessageDigestAlgorithms.MD5)
-                .digest(string.toByteArray())
+            .digest(string.toByteArray())
         val result = StringBuilder(bytes.size * 2)
 
         bytes.forEach {

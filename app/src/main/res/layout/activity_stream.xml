@@ -1,19 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.rvirin.onvif.demo.StreamActivity">
+    tools:context=".StreamActivity">
 
     <SurfaceView
         android:id="@+id/surfaceView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:layout_height="match_parent" />
+
+    <!--    <SurfaceView-->
+    <!--        android:id="@+id/surfaceView1"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        app:layout_constraintBottom_toTopOf="@id/surfaceView2"-->
+    <!--        app:layout_constraintEnd_toStartOf="@id/surfaceView3"-->
+    <!--        app:layout_constraintStart_toStartOf="parent"-->
+    <!--        app:layout_constraintTop_toTopOf="parent" />-->
+
+    <!--    <SurfaceView-->
+    <!--        android:id="@+id/surfaceView2"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        app:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        app:layout_constraintEnd_toStartOf="@id/surfaceView4"-->
+    <!--        app:layout_constraintStart_toStartOf="parent"-->
+    <!--        app:layout_constraintTop_toBottomOf="@id/surfaceView1" />-->
+
+    <!--    <SurfaceView-->
+    <!--        android:id="@+id/surfaceView3"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        app:layout_constraintBottom_toTopOf="@id/surfaceView4"-->
+    <!--        app:layout_constraintEnd_toEndOf="parent"-->
+    <!--        app:layout_constraintStart_toEndOf="@id/surfaceView1"-->
+    <!--        app:layout_constraintTop_toTopOf="parent" />-->
+
+    <!--    <SurfaceView-->
+    <!--        android:id="@+id/surfaceView4"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        app:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        app:layout_constraintEnd_toEndOf="parent"-->
+    <!--        app:layout_constraintStart_toEndOf="@id/surfaceView2"-->
+    <!--        app:layout_constraintTop_toBottomOf="@id/surfaceView3" />-->
 
     <Button
         android:id="@+id/b_start_stop"
@@ -21,10 +53,10 @@
         android:layout_height="0dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
+        android:backgroundTint="#ffffff"
         android:text="@string/start_player"
-        app:layout_constraintBottom_toBottomOf="@+id/surfaceView"
-        app:layout_constraintEnd_toStartOf="@+id/surfaceView"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toEndOf="@+id/surfaceView" />
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
-</android.support.constraint.ConstraintLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

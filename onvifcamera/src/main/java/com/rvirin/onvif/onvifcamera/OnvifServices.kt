@@ -45,7 +45,7 @@ class OnvifServices {
                             paths.deviceInformation = retrievePath(uri)
 
                         } else if (currentNamespace == GetProfiles.namespace() ||
-                                currentNamespace == GetStreamURI.namespace()) {
+                            currentNamespace == GetStreamURI.namespace()) {
                             val uri = retrieveXAddr(xpp)
                             paths.profiles = retrievePath(uri)
                             paths.streamURI = retrievePath(uri)
@@ -88,7 +88,7 @@ class OnvifServices {
                 result += url.query
             }
 
-           return result
+            return result
         }
 
         /**
@@ -100,7 +100,7 @@ class OnvifServices {
 
             var eventType = xpp.eventType
             while (eventType != XmlPullParser.END_DOCUMENT ||
-                    (eventType == XmlPullParser.END_TAG && xpp.name == "Service")) {
+                (eventType == XmlPullParser.END_TAG && xpp.name == "Service")) {
 
                 if (eventType == XmlPullParser.START_TAG && xpp.name == "XAddr") {
                     xpp.next()

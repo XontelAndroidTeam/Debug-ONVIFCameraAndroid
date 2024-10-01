@@ -12,14 +12,20 @@ import com.rvirin.onvif.onvifcamera.OnvifMediaStreamURI.Companion.parseStreamURI
 import com.rvirin.onvif.onvifcamera.OnvifServices.Companion.servicesCommand
 import com.rvirin.onvif.onvifcamera.OnvifXMLBuilder.envelopeEnd
 import com.rvirin.onvif.onvifcamera.OnvifXMLBuilder.soapHeader
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.Response
 import okio.Buffer
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
 
 @JvmField
 var currentDevice = OnvifDevice("", "", "")
@@ -107,9 +113,14 @@ class OnvifResponse(val request: OnvifRequest) {
  * @param username the username to login on the camera
  * @param password the password to login on the camera
  */
-class OnvifDevice(val ipAddress: String, @JvmField val username: String, @JvmField val password: String) {
+class OnvifDevice(
+    val ipAddress: String,
+    @JvmField val username: String,
+    @JvmField val password: String
+) {
 
     var listener: OnvifListener? = null
+
     /// We use this variable to know if the connection has been successful (retrieve device information)
     var isConnected = false
 
@@ -123,164 +134,153 @@ class OnvifDevice(val ipAddress: String, @JvmField val username: String, @JvmFie
 
     fun getServices() {
         val request = OnvifRequest(servicesCommand, OnvifRequest.Type.GetServices)
-        ONVIFcommunication().execute(request)
+        executeOnvifRequest(request)
     }
 
     fun getDeviceInformation() {
         val request = OnvifRequest(deviceInformationCommand, OnvifRequest.Type.GetDeviceInformation)
-        ONVIFcommunication().execute(request)
+        executeOnvifRequest(request)
     }
 
     fun getProfiles() {
         val request = OnvifRequest(getProfilesCommand(), OnvifRequest.Type.GetProfiles)
-        ONVIFcommunication().execute(request)
+        executeOnvifRequest(request)
     }
 
     fun getStreamURI() {
 
         mediaProfiles.firstOrNull()?.let {
             val request = OnvifRequest(getStreamURICommand(it), OnvifRequest.Type.GetStreamURI)
-            ONVIFcommunication().execute(request)
+            executeOnvifRequest(request)
         }
     }
 
     fun getStreamURI(profile: MediaProfile) {
         val request = OnvifRequest(getStreamURICommand(profile), OnvifRequest.Type.GetStreamURI)
-        ONVIFcommunication().execute(request)
+        executeOnvifRequest(request)
     }
 
-    /**
-     * Communication in Async Task between Android and ONVIF camera
-     */
-    private inner class ONVIFcommunication : AsyncTask<OnvifRequest, Void, OnvifResponse>() {
+    private val scope = CoroutineScope(Dispatchers.Main)
 
-        /**
-         * Background process of communication
-         *
-         * @param params The Onvif Request to execute
-         * @return `OnvifResponse`
-         */
-        override fun doInBackground(vararg params: OnvifRequest): OnvifResponse {
-            val onvifRequest = params[0]
-
-            val client = OkHttpClient.Builder()
-                    .connectTimeout(10000, TimeUnit.SECONDS)
-                    .writeTimeout(100, TimeUnit.SECONDS)
-                    .readTimeout(10000, TimeUnit.SECONDS)
-                    .build()
-
-            val reqBodyType = MediaType.parse("application/soap+xml; charset=utf-8;")
-
-            val reqBody = RequestBody.create(reqBodyType,
-                    soapHeader + onvifRequest.xmlCommand + envelopeEnd)
-
-            /* Request to ONVIF device */
-            var request: Request? = null
-            try {
-                request = Request.Builder()
-                        .url(urlForRequest(onvifRequest))
-                        .addHeader("Content-Type", "text/xml; charset=utf-8")
-                        .post(reqBody)
-                        .build()
-            } catch (e: IllegalArgumentException) {
-                Log.e("ERROR", e.message!!)
-                e.printStackTrace()
+    fun executeOnvifRequest(onvifRequest: OnvifRequest) {
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                doOnvifCommunication(onvifRequest)
             }
+            onPostExecute(result)
+        }
+    }
 
-            var result = OnvifResponse(onvifRequest)
+    private  fun doOnvifCommunication(onvifRequest: OnvifRequest): OnvifResponse {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(10000, TimeUnit.SECONDS)
+            .writeTimeout(100, TimeUnit.SECONDS)
+            .readTimeout(10000, TimeUnit.SECONDS)
+            .build()
 
-            if (request != null) {
-                try {
-                    /* Response from ONVIF device */
-                    var response = client.newCall(request).execute()
-                    Log.d("BODY", bodyToString(request))
-                    Log.d("RESPONSE", response.toString())
+        val reqBodyType = "application/soap+xml; charset=utf-8".toMediaTypeOrNull()
 
-                    if (response.code() == 401) {
-                        /* Retrieve Digest header */
-                        val digestHeader = response.header("WWW-Authenticate")
-                        val digestInformation = OnvifDigestInformation(username, password, pathForRequest(onvifRequest), digestHeader!!)
-                        val authorizationHeader = digestInformation.authorizationHeader
-                        Log.d("AUTHORIZATION HEADER", authorizationHeader)
+        val reqBody = RequestBody.create(
+            reqBodyType,
+            soapHeader + onvifRequest.xmlCommand + envelopeEnd
+        )
 
+        var request: Request? = null
+        try {
+            request = Request.Builder()
+                .url(urlForRequest(onvifRequest))
+                .addHeader("Content-Type", "text/xml; charset=utf-8")
+                .post(reqBody)
+                .build()
+        } catch (e: IllegalArgumentException) {
+            Log.e("ERROR", e.message!!)
+            e.printStackTrace()
+        }
+
+        var result = OnvifResponse(onvifRequest)
+
+        if (request != null) {
+            try {
+                var response: Response? = client.newCall(request).execute()
+                Log.d("BODY", bodyToString(request))
+                Log.d("RESPONSE", response.toString())
+
+                if (response?.code == 401) {
+                    val digestHeader = response.header("WWW-Authenticate")
+                    val digestInformation = OnvifDigestInformation(
+                        username,
+                        password,
+                        pathForRequest(onvifRequest),
+                        digestHeader!!
+                    )
+                    val authorizationHeader = digestInformation.authorizationHeader
+                    Log.d("AUTHORIZATION HEADER", authorizationHeader.toString())
+
+                    authorizationHeader?.let {
                         try {
-                            request = Request.Builder().url(urlForRequest(onvifRequest))
-                                    .addHeader("Content-Type", "text/xml; charset=utf-8")
-                                    .addHeader("Authorization", authorizationHeader)
-                                    .post(reqBody)
-                                    .build()
+                            request = Request.Builder()
+                                .url(urlForRequest(onvifRequest))
+                                .addHeader("Content-Type", "text/xml; charset=utf-8")
+                                .addHeader("Authorization", it)
+                                .post(reqBody)
+                                .build()
                         } catch (e: IllegalArgumentException) {
                             Log.e("ERROR", e.message!!)
                             e.printStackTrace()
                         }
 
                         result = OnvifResponse(onvifRequest)
-                        response = client.newCall(request).execute()
+                        response = request?.let { it1 -> client.newCall(it1).execute() }
                     }
-
-                    if (response.code() != 200) {
-                        val responseBody = response.body()!!.string()
-                        val message = response.code().toString() + " - " + response.message() + "\n" + responseBody
-                        result.updateResponse(false, message)
-                    } else {
-                        result.updateResponse(true, response.body()!!.string())
-                        val uiMessage = parseOnvifResponses(result)
-                        result.parsingUIMessage = uiMessage
-                    }
-                } catch (e: IOException) {
-                    result.updateResponse(false, e.message!!)
                 }
-            }
 
-            return result
-        }
-
-        /**
-         * @return the appropriate URL for calling a web service.
-         * Working if the camera is behind a firewall also.
-         * @param request the kind of request we're processing.
-         */
-        fun urlForRequest(request: OnvifRequest): String {
-            return currentDevice.url + pathForRequest(request)
-        }
-
-        fun pathForRequest(request: OnvifRequest): String {
-            when (request.type) {
-                OnvifRequest.Type.GetServices -> return currentDevice.paths.services
-                OnvifRequest.Type.GetDeviceInformation -> return currentDevice.paths.deviceInformation
-                OnvifRequest.Type.GetProfiles -> return currentDevice.paths.profiles
-                OnvifRequest.Type.GetStreamURI -> return currentDevice.paths.streamURI
-            }
-        }
-
-
-        /**
-         * Util function to log the body of a `Request`
-         */
-        private fun bodyToString(request: Request): String {
-
-            try {
-                val copy = request.newBuilder().build()
-                val buffer = Buffer()
-                copy.body()!!.writeTo(buffer)
-                return buffer.readUtf8()
+                if (response?.code != 200) {
+                    val responseBody = response?.body?.string()
+                    val message = "${response?.code} - ${response?.message}\n$responseBody"
+                    result.updateResponse(false, message)
+                } else {
+                    response?.body?.string()?.let { result.updateResponse(true, it) }
+                    val uiMessage = parseOnvifResponses(result)
+                    result.parsingUIMessage = uiMessage
+                }
             } catch (e: IOException) {
-                return "did not work"
+                result.updateResponse(false, e.message!!)
             }
         }
 
-        /**
-         * Called when AsyncTask background process is finished
-         *
-         * @param result the `OnvifResponse`
-         */
-        override fun onPostExecute(result: OnvifResponse) {
-            Log.d("RESULT", result.success.toString())
+        return result
+    }
 
-            listener?.requestPerformed(result)
+    private fun urlForRequest(request: OnvifRequest): String {
+        return currentDevice.url + pathForRequest(request)
+    }
+
+    private fun pathForRequest(request: OnvifRequest): String {
+        return when (request.type) {
+            OnvifRequest.Type.GetServices -> currentDevice.paths.services
+            OnvifRequest.Type.GetDeviceInformation -> currentDevice.paths.deviceInformation
+            OnvifRequest.Type.GetProfiles -> currentDevice.paths.profiles
+            OnvifRequest.Type.GetStreamURI -> currentDevice.paths.streamURI
         }
     }
 
+    private fun bodyToString(request: Request): String {
+        return try {
+            val copy = request.newBuilder().build()
+            val buffer = Buffer()
+            copy.body?.writeTo(buffer)
+            buffer.readUtf8()
+        } catch (e: IOException) {
+            "did not work"
+        }
+    }
+
+    private fun onPostExecute(result: OnvifResponse) {
+        Log.d("RESULT", result.success.toString())
+        listener?.requestPerformed(result)
+    }
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * Util method to append the credentials to the rtsp URI
      * Working if the camera is behind a firewall.
@@ -317,7 +317,8 @@ class OnvifDevice(val ipAddress: String, @JvmField val username: String, @JvmFie
     private fun parseOnvifResponses(result: OnvifResponse): String {
         var parsedResult = "Parsing failed"
         if (!result.success) {
-            parsedResult = "Communication error trying to get " + result.request + ":\n\n" + result.error
+            parsedResult =
+                "Communication error trying to get " + result.request + ":\n\n" + result.error
 
         } else {
             if (result.request.type == OnvifRequest.Type.GetServices) {
@@ -326,7 +327,11 @@ class OnvifDevice(val ipAddress: String, @JvmField val username: String, @JvmFie
                 }
             } else if (result.request.type == OnvifRequest.Type.GetDeviceInformation) {
                 isConnected = true
-                if (parseDeviceInformationResponse(result.result!!, currentDevice.deviceInformation)) {
+                if (parseDeviceInformationResponse(
+                        result.result!!,
+                        currentDevice.deviceInformation
+                    )
+                ) {
                     parsedResult = deviceInformationToString(currentDevice.deviceInformation)
                 }
 
